@@ -2,6 +2,11 @@ name: Deploy Pages
 
 on:
   workflow_call:
+    inputs:
+      deploy-path:
+        required: false
+        default: "website"
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +27,6 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: website
+          path: ${{ inputs.deploy-path }}
 
       - uses: actions/deploy-pages@v4
