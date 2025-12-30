@@ -8,6 +8,11 @@ on:
         default: "website"
         type: string
 
+permissions: # documents intent (permissions in reusable workflow are ignored)
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
   group: pages
   cancel-in-progress: false
