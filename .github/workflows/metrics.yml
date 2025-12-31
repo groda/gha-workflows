@@ -106,8 +106,11 @@ jobs:
             '[ "\($DATE) 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json)
 
           # Remove any existing line for today’s 14-day total
-          grep -v "^$TODAY 14-day total,${{ github.repository }}," "$FILE" > "$FILE.tmp" || true
-          mv "$FILE.tmp" "$FILE"
+          # Remove old 14-day total line if it exists
+          if [ -f "$FILE" ]; then
+            grep -v "^$TODAY 14-day total,${{ github.repository }}," "$FILE" > "$FILE.tmp" || true
+            mv "$FILE.tmp" "$FILE"
+          fi
 
           # Append the new totals line
           echo "$TOTAL_LINE" >> "$FILE"
