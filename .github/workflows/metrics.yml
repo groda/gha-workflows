@@ -70,7 +70,6 @@ jobs:
 
       - name: Append/update metrics CSV in metrics repo
         run: |
-          # Clone the metrics repository
           git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git metrics-temp
           cd metrics-temp
 
@@ -88,7 +87,7 @@ jobs:
           TMPFILE="$FILE.tmp"
           cp "$FILE" "$TMPFILE"
 
-          # Loop over each clone entry and update CSV
+          # Append/update all daily lines from clones.json
           jq -r --arg REPO "${{ github.repository }}" \
             '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json | while read LINE; do
               DATE=$(echo "$LINE" | cut -d',' -f1)
@@ -99,9 +98,18 @@ jobs:
               echo "$LINE" >> "$TMPFILE"
           done
 
+          # Append/update the 14-day totals line
+          TOTAL_LINE=$(jq -r --arg REPO "${{ github.repository }}" \
+            '[ "14-day totals", $REPO, .count, .uniques ] | @csv' ../clones.json)
+          # Remove old totals line if present
+          grep -v "^14-day totals,${{ github.repository }}," "$TMPFILE" > "$TMPFILE.new" || true
+          mv "$TMPFILE.new" "$TMPFILE"
+          echo "$TOTAL_LINE" >> "$TMPFILE"
+
           # Replace original CSV with updated CSV
           mv "$TMPFILE" "$FILE"
 
           git add "$FILE"
           git commit -m "metrics: record clone stats for ${{ github.repository }}" || true
           git push
+
