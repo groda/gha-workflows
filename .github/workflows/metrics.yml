@@ -35,6 +35,12 @@ jobs:
           echo "CLONES=$CLONES" >> $GITHUB_ENV
           echo "UNIQUES=$UNIQUES" >> $GITHUB_ENV
 
+      - name: Debug clone API
+        run: |
+          echo "===== clones.json ====="
+          cat clones.json
+          echo "======================"
+
       - name: Append to metrics repo
         run: |
           git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git metrics-temp
