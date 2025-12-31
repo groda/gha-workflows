@@ -3,6 +3,10 @@ name: Record clone metrics
 on:
   workflow_call:
     inputs:
+      observed-repo:
+        description: "Repository to fetch clone metrics from (OWNER/REPO)"
+        required: true
+        type: string
       metrics-repo:
         description: "Target repo for storing metrics (OWNER/REPO)"
         required: true
