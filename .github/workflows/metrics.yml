@@ -1,0 +1,50 @@
+name: Record clone metrics
+
+on:
+  workflow_call:
+    inputs:
+      metrics-repo:
+        description: "Target repo for storing metrics (OWNER/REPO)"
+        required: true
+        type: string
+    secrets:
+      METRICS_PAT:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Fetch clone stats
+        run: |
+          curl -s \
+            -H "Authorization: token ${{ secrets.METRICS_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/traffic/clones \
+            > clones.json
+
+          echo "CLONES=$(jq '.count' clones.json)" >> $GITHUB_ENV
+          echo "UNIQUES=$(jq '.uniques' clones.json)" >> $GITHUB_ENV
+
+      - name: Append to metrics repo
+        run: |
+          git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git
+          cd $(basename "${{ inputs.metrics-repo }}")
+
+          git config user.name "metrics-bot"
+          git config user.email "metrics-bot@users.noreply.github.com"
+
+          mkdir -p data
+          FILE="data/$(echo '${{ github.repository }}' | tr '/' '__').csv"
+
+          echo "$(date +%F),${{ github.repository }},${{ env.CLONES }},${{ env.UNIQUES }}" >> "$FILE"
+
+          git add "$FILE"
+          git commit -m "Record clone metrics for ${{ github.repository }}"
+          git push
