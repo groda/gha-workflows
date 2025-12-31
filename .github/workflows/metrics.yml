@@ -99,12 +99,18 @@ jobs:
           done
 
           # Append/update the 14-day totals line
+          # Compute the totals line with today’s date
+          TODAY=$(date +%F)
           TOTAL_LINE=$(jq -r --arg REPO "${{ github.repository }}" \
-            '[ "14-day totals", $REPO, .count, .uniques ] | @csv' ../clones.json)
-          # Remove old totals line if present
-          grep -v "^14-day totals,${{ github.repository }}," "$TMPFILE" > "$TMPFILE.new" || true
-          mv "$TMPFILE.new" "$TMPFILE"
-          echo "$TOTAL_LINE" >> "$TMPFILE"
+            --arg DATE "$TODAY" \
+            '[ "\($DATE) 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json)
+
+          # Remove any existing line for today’s 14-day total
+          grep -v "^$TODAY 14-day total,${{ github.repository }}," "$FILE" > "$FILE.tmp" || true
+          mv "$FILE.tmp" "$FILE"
+
+          # Append the new totals line
+          echo "$TOTAL_LINE" >> "$FILE"
 
           # Replace original CSV with updated CSV
           mv "$TMPFILE" "$FILE"
