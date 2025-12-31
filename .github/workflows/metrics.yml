@@ -68,28 +68,39 @@ jobs:
           cat clones.json
           echo "======================"
 
-      - name: Append to metrics repo
+      - name: Append/update metrics CSV in metrics repo
         run: |
+          # Clone the metrics repository
           git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git metrics-temp
           cd metrics-temp
 
           git config user.name "metrics-bot"
           git config user.email "metrics-bot@users.noreply.github.com"
 
-          DATE=$(date +%F)
           FILE="data/$(echo '${{ github.repository }}' | tr '/' '__').csv"
-
           mkdir -p data
+
+          # Create header if the file doesn't exist
           if [ ! -f "$FILE" ]; then
             echo "date,repository,clones,uniques" > "$FILE"
           fi
 
-          # Remove today's entry if it exists
-          grep -v "^$DATE," "$FILE" > "$FILE.tmp" || true
-          mv "$FILE.tmp" "$FILE"
+          TMPFILE="$FILE.tmp"
+          cp "$FILE" "$TMPFILE"
 
-          # Append new line
-          echo "$DATE,${{ github.repository }},$CLONES,$UNIQUES" >> "$FILE"
+          # Loop over each clone entry and update CSV
+          jq -r --arg REPO "${{ github.repository }}" \
+            '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json | while read LINE; do
+              DATE=$(echo "$LINE" | cut -d',' -f1)
+              # Remove any existing line for this date + repo
+              grep -v "^$DATE,${{ github.repository }}," "$TMPFILE" > "$TMPFILE.new" || true
+              mv "$TMPFILE.new" "$TMPFILE"
+              # Append the new line
+              echo "$LINE" >> "$TMPFILE"
+          done
+
+          # Replace original CSV with updated CSV
+          mv "$TMPFILE" "$FILE"
 
           git add "$FILE"
           git commit -m "metrics: record clone stats for ${{ github.repository }}" || true
