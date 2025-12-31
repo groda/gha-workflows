@@ -5,8 +5,8 @@ on:
     inputs:
       observed-repo:
         description: "Repository to fetch clone metrics from (OWNER/REPO)"
-        required: true
-        type: string
+        required: false
+        default: ${{ github.repository }}
       metrics-repo:
         description: "Target repo for storing metrics (OWNER/REPO)"
         required: true
