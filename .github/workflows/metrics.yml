@@ -29,22 +29,35 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/traffic/clones \
             > clones.json
 
-          echo "CLONES=$(jq '.count' clones.json)" >> $GITHUB_ENV
-          echo "UNIQUES=$(jq '.uniques' clones.json)" >> $GITHUB_ENV
+          CLONES=$(jq -r '.count // 0' clones.json)
+          UNIQUES=$(jq -r '.uniques // 0' clones.json)
+
+          echo "CLONES=$CLONES" >> $GITHUB_ENV
+          echo "UNIQUES=$UNIQUES" >> $GITHUB_ENV
 
       - name: Append to metrics repo
         run: |
-          git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git
-          cd $(basename "${{ inputs.metrics-repo }}")
+          git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git metrics-temp
+          cd metrics-temp
 
           git config user.name "metrics-bot"
           git config user.email "metrics-bot@users.noreply.github.com"
 
-          mkdir -p data
+          DATE=$(date +%F)
           FILE="data/$(echo '${{ github.repository }}' | tr '/' '__').csv"
 
-          echo "$(date +%F),${{ github.repository }},${{ env.CLONES }},${{ env.UNIQUES }}" >> "$FILE"
+          mkdir -p data
+          if [ ! -f "$FILE" ]; then
+            echo "date,repository,clones,uniques" > "$FILE"
+          fi
+
+          # Remove today's entry if it exists
+          grep -v "^$DATE," "$FILE" > "$FILE.tmp" || true
+          mv "$FILE.tmp" "$FILE"
+
+          # Append new line
+          echo "$DATE,${{ github.repository }},$CLONES,$UNIQUES" >> "$FILE"
 
           git add "$FILE"
-          git commit -m "Record clone metrics for ${{ github.repository }}"
+          git commit -m "metrics: record clone stats for ${{ github.repository }}" || true
           git push
