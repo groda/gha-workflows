@@ -70,16 +70,20 @@ jobs:
 
       - name: Append/update metrics CSV in metrics repo
         run: |
+          set -e
+
+          # Clone metrics repo
           git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git metrics-temp
           cd metrics-temp
 
           git config user.name "metrics-bot"
           git config user.email "metrics-bot@users.noreply.github.com"
 
+          # CSV file path
           FILE="data/$(echo '${{ github.repository }}' | tr '/' '__').csv"
           mkdir -p data
 
-          # Create header if the file doesn't exist
+          # Ensure CSV exists with header
           if [ ! -f "$FILE" ]; then
             echo "date,repository,clones,uniques" > "$FILE"
           fi
@@ -87,39 +91,34 @@ jobs:
           TMPFILE="$FILE.tmp"
           cp "$FILE" "$TMPFILE"
 
-          # Append/update all daily lines from clones.json
-          jq -r --arg REPO "${{ github.repository }}" \
+          # Bash variable for repo
+          REPO="${{ github.repository }}"
+          TODAY=$(date +%F)
+
+          # --- Update daily clone lines from clones.json ---
+          jq -r --arg REPO "$REPO" \
             '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json | while read LINE; do
               DATE=$(echo "$LINE" | cut -d',' -f1)
               # Remove any existing line for this date + repo
-              grep -v "^$DATE,${{ github.repository }}," "$TMPFILE" > "$TMPFILE.new" || true
+              grep -v "^$DATE,$REPO," "$TMPFILE" > "$TMPFILE.new" || true
               mv "$TMPFILE.new" "$TMPFILE"
               # Append the new line
               echo "$LINE" >> "$TMPFILE"
           done
 
-          # Append/update the 14-day totals line
-          # Compute the totals line with today’s date
-          TODAY=$(date +%F)
-          REPO="${{ github.repository }}"
-          TOTAL_LINE=$(jq -r --arg REPO "${{ github.repository }}" \
-            --arg DATE "$TODAY" \
+          # --- Append/update today's 14-day total ---
+          TOTAL_LINE=$(jq -r --arg REPO "$REPO" --arg DATE "$TODAY" \
             '[ "\($DATE) 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json)
 
-          # Remove any existing line for today’s 14-day total
-          # Remove old 14-day total line if it exists
-          if [ -f "$FILE" ]; then
-            grep -v "^$TODAY 14-day total,$REPO," "$FILE" > "$FILE.tmp" || true
-            mv "$FILE.tmp" "$FILE"
-          fi
+          # Remove old 14-day total line for today
+          grep -v "^$TODAY 14-day total,$REPO," "$TMPFILE" > "$TMPFILE.new" || true
+          mv "$TMPFILE.new" "$TMPFILE"
+          echo "$TOTAL_LINE" >> "$TMPFILE"
 
-          # Append the new totals line
-          echo "$TOTAL_LINE" >> "$FILE"
-
-          # Replace original CSV with updated CSV
+          # Replace original CSV with TMPFILE
           mv "$TMPFILE" "$FILE"
 
+          # Commit and push
           git add "$FILE"
-          git commit -m "metrics: record clone stats for ${{ github.repository }}" || true
+          git commit -m "metrics: record clone stats for $REPO" || true
           git push
-
