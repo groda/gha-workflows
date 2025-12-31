@@ -31,7 +31,7 @@ jobs:
           GH_TOKEN: ${{ secrets.METRICS_PAT }}
           OBSERVED_REPO: ${{ inputs.observed-repo }}
         run: |
-          curl -iL \
+          curl -L \
             -D headers.txt \
             -o clones.json \
             -H "Authorization: Bearer $GH_TOKEN" \
