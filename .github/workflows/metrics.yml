@@ -68,57 +68,52 @@ jobs:
           cat clones.json
           echo "======================"
 
-      - name: Append/update metrics CSV in metrics repo
+      
+      - name: Append and Deduplicate metrics CSV
         run: |
           set -e
 
-          # Clone metrics repo
+          # 1. Setup Repo
           git clone https://x-access-token:${{ secrets.METRICS_PAT }}@github.com/${{ inputs.metrics-repo }}.git metrics-temp
           cd metrics-temp
-
           git config user.name "metrics-bot"
           git config user.email "metrics-bot@users.noreply.github.com"
 
-          # CSV file path
+          # 2. Setup File
           FILE="data/$(echo '${{ github.repository }}' | tr '/' '__').csv"
           mkdir -p data
-
-          # Ensure CSV exists with header
           if [ ! -f "$FILE" ]; then
             echo "date,repository,clones,uniques" > "$FILE"
           fi
 
-          TMPFILE="$FILE.tmp"
-          cp "$FILE" "$TMPFILE"
-
-          # Bash variable for repo
           REPO="${{ github.repository }}"
           TODAY=$(date +%F)
 
-          # --- Update daily clone lines from clones.json ---
-          jq -r --arg REPO "$REPO" \
-            '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json | while read LINE; do
-              DATE=$(echo "$LINE" | cut -d',' -f1)
-              # Remove any existing line for this date + repo
-              grep -v "^$DATE,$REPO," "$TMPFILE" > "$TMPFILE.new" || true
-              mv "$TMPFILE.new" "$TMPFILE"
-              # Append the new line
-              echo "$LINE" >> "$TMPFILE"
-          done
+          # 3. APPEND ALL DATA (Raw)
+          # Get daily stats from clones.json
+          jq -r --arg REPO "$REPO" '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json >> "$FILE"
+          # Get 14-day total
+          jq -r --arg REPO "$REPO" --arg DATE "$TODAY" '[ "\($DATE) ~ 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json >> "$FILE"
 
-          # --- Append/update today's 14-day total ---
-          TOTAL_LINE=$(jq -r --arg REPO "$REPO" --arg DATE "$TODAY" \
-            '[ "\($DATE) 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json)
+          # 4. DEDUPLICATE AND SORT DESCENDING (The "Magic" Step) 
+          # Check if the first line is actually the header. If not, we add it.
+          if ! head -n 1 "$FILE" | grep -q "^date,"; then
+              # No header found? Prepend it to the file.
+              SED_HEADER="date,repository,clones,uniques"
+              sed -i "1i $SED_HEADER" "$FILE"
+          fi
+          
+          # Save the header to the tmp file first
+          head -n 1 "$FILE" > "$FILE.tmp"
+          # take everything EXCEPT the header (tail -n +2), deduplicate with awk, and sort desc
+          # -F, : Use comma as separator
+          tail -n +2 "$FILE" | awk -F, '{a[$1,$2]=$0} END {for (i in a) print a[i]}' | sort -t, -k1,1r >> "$FILE.tmp"
+          
+          mv "$FILE.tmp" "$FILE"
 
-          # Remove old 14-day total line for today
-          grep -v "^$TODAY 14-day total,$REPO," "$TMPFILE" > "$TMPFILE.new" || true
-          mv "$TMPFILE.new" "$TMPFILE"
-          echo "$TOTAL_LINE" >> "$TMPFILE"
-
-          # Replace original CSV with TMPFILE
-          mv "$TMPFILE" "$FILE"
-
-          # Commit and push
+          # 5. Commit and Push
           git add "$FILE"
-          git commit -m "metrics: record clone stats for $REPO" || true
+          git commit -m "metrics: record and deduplicate stats for $REPO" || true
           git push
+    
+     
