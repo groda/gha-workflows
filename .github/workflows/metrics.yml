@@ -103,7 +103,7 @@ jobs:
           jq -r --arg REPO "$REPO" '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json >> "$FILE"   
           # Append the summary using the LATEST_JSON_DATE and the Tilde (~) for sorting
           jq -r --arg REPO "$REPO" --arg DATE "$LATEST_JSON_DATE" \
-            '[ "\($DATE) ~ 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json >> "$FILE"
+            '[ "\($DATE)~ 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json >> "$FILE"
           
           # 5. DEDUPLICATE AND SORT DESCENDING (The "Magic" Step) 
           # Check if the first line is actually the header. If not, we add it.
