@@ -87,15 +87,25 @@ jobs:
           fi
 
           REPO="${{ github.repository }}"
-          TODAY=$(date +%F)
 
-          # 3. APPEND ALL DATA (Raw)
-          # Get daily stats from clones.json
-          jq -r --arg REPO "$REPO" '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json >> "$FILE"
-          # Get 14-day total
-          jq -r --arg REPO "$REPO" --arg DATE "$TODAY" '[ "\($DATE) ~ 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json >> "$FILE"
+          # 3. GET THE LATEST DATE FROM JSON
+          # This looks at the last entry in the clones array and grabs the first 10 chars (YYYY-MM-DD)
+          # Note: the last recorded date is not necessarily today's date
+          LATEST_JSON_DATE=$(jq -r '.clones[-1].timestamp[0:10]' ../clones.json)
 
-          # 4. DEDUPLICATE AND SORT DESCENDING (The "Magic" Step) 
+          # If for some reason the JSON is empty, fallback to system date to avoid errors
+          if [ "$LATEST_JSON_DATE" == "null" ] || [ -z "$LATEST_JSON_DATE" ]; then
+            LATEST_JSON_DATE=$(date +%F)
+          fi
+
+          # 4. APPEND ALL DATA (Raw)
+          # Get daily stats from clones.json and append to $FILE
+          jq -r --arg REPO "$REPO" '.clones[] | [.timestamp[0:10], $REPO, .count, .uniques] | @csv' ../clones.json >> "$FILE"   
+          # Append the summary using the LATEST_JSON_DATE and the Tilde (~) for sorting
+          jq -r --arg REPO "$REPO" --arg DATE "$LATEST_JSON_DATE" \
+            '[ "\($DATE) ~ 14-day total", $REPO, .count, .uniques ] | @csv' ../clones.json >> "$FILE"
+          
+          # 5. DEDUPLICATE AND SORT DESCENDING (The "Magic" Step) 
           # Check if the first line is actually the header. If not, we add it.
           if ! head -n 1 "$FILE" | grep -q "^date,"; then
               # No header found? Prepend it to the file.
@@ -111,7 +121,7 @@ jobs:
           
           mv "$FILE.tmp" "$FILE"
 
-          # 5. Commit and Push
+          # 6. Commit and Push
           git add "$FILE"
           git commit -m "metrics: record and deduplicate stats for $REPO" || true
           git push
