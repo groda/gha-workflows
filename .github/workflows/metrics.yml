@@ -1,10 +1,10 @@
-name: Record clone metrics
+name: Record clone and view metrics
 
 on:
   workflow_call:
     inputs:
       observed-repo:
-        description: "Repository to fetch clone metrics from (OWNER/REPO)"
+        description: "Repository to fetch clone and view metrics from (OWNER/REPO)"
         required: false
         default: ${{ github.repository }}
         type: string
