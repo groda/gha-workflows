@@ -1,0 +1,78 @@
+name: Execute Jupyter Notebooks and Report
+
+on:
+  workflow_call:
+    inputs:
+      target_repo:
+        description: 'The full name of the repository to checkout (e.g., username/repo_name)'
+        required: true
+        type: string
+
+jobs:
+  run-notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Current Repo
+        uses: actions/checkout@v4
+
+      - name: Checkout External Repo
+        uses: actions/checkout@v4
+        with:
+          # We reference the input variable here
+          repository: ${{ inputs.target_repo }}
+          path: 'target-repo'
+          #token: ${{ secrets.PAT_TOKEN }} # Only needed if the other repo is private
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          # This enables the automatic cache
+          cache: 'pip'
+          # This points the cache to the specific file in the checked-out repo
+          cache-dependency-path: 'target-repo/requirements.txt'
+          
+      - name: Install Requirements
+        run: |
+          pip install papermill ipykernel
+          if [ -f target-repo/requirements.txt ]; then pip install -r target-repo/requirements.txt; fi
+
+      - name: Execute Notebooks and Generate Report
+        run: |
+          echo "## Notebook Execution Report" > report.md
+          echo "| Notebook Name | Last Run | Status |" >> report.md
+          echo "|---|---|---|" >> report.md
+          
+          cd target-repo
+          for file in *.ipynb; do
+            echo "Running $file..."
+            # Get current timestamp
+            timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            
+            # Execute with Papermill
+            if papermill "$file" "${file%.ipynb}_out.ipynb" --execution-timeout 420; then
+            #if echo "$file" >"${file%.ipynb}_out.ipynb"; then
+              status="✅ Success"
+            else
+              status="❌ Failed (or Timed Out)"
+            fi
+            
+            echo "| $file | $timestamp | $status |" >> ../report.md
+          done
+          
+      - name: Upload Executed Notebooks and Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-notebooks-results
+          path: |
+            report.md
+            target-repo/*_out.ipynb
+            
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-report
+          path: report.md
+
+      - name: Post Summary to Workflow
+        run: cat report.md >> $GITHUB_STEP_SUMMARY
