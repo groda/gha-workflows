@@ -7,6 +7,11 @@ on:
         description: 'The full name of the repository to checkout (e.g., username/repo_name)'
         required: true
         type: string
+      timeout:
+        description: 'Execution timeout in seconds for papermill'
+        required: false
+        type: number
+        default: 420
 
 jobs:
   run-notebooks:
@@ -52,7 +57,7 @@ jobs:
             timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
             
             # Execute with Papermill
-            if papermill "$file" "${file%.ipynb}_out.ipynb" --execution-timeout 420; then
+            if papermill "$file" "${file%.ipynb}_out.ipynb" --execution-timeout ${{ inputs.timeout }}; then
             #if echo "$file" >"${file%.ipynb}_out.ipynb"; then
               status="✅ Success"
             else
