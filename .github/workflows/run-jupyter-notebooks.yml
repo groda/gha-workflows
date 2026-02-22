@@ -12,10 +12,15 @@ on:
         required: false
         type: number
         default: 420
+      ubuntu_image:
+        description: 'Ubuntu image to run on'
+        required: false
+        type: string
+        default: ubuntu-latest
 
 jobs:
   run-notebooks:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.ubuntu_image }}
     permissions:
       contents: write  # Allows the bot to push the .md file
     steps:
