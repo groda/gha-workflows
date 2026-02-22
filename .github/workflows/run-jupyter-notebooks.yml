@@ -38,7 +38,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          # Colab currently runs Python 3.12
+          python-version: '3.12'
           # This enables the automatic cache
           cache: 'pip'
           # This points the cache to the specific file in the checked-out repo
