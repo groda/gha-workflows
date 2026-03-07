@@ -64,13 +64,12 @@ jobs:
             
             # Execute with Papermill
             if papermill "$file" "${file%.ipynb}_out.ipynb" --execution-timeout ${{ inputs.timeout }}; then
-            #if echo "$file" >"${file%.ipynb}_out.ipynb"; then
               status="✅ Success"
             else
               status="❌ Failed (or Timed Out)"
             fi
             
-            echo "| $file | $timestamp | $status |" >> ../report.md
+            echo "| [$file]($file) | $timestamp | $status |" >> ../report.md
           done
           
       - name: Upload Executed Notebooks and Report
