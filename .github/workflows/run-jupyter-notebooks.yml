@@ -75,7 +75,8 @@ jobs:
             else
               status="❌ Failed (or Timed Out)"
             fi
-            elapsed=$(date -u -r $(($(date +"%s") - start)) +%T)
+            end=$(date +%s)
+            elapsed=$(date -u -d "@$(( $(date +%s) - start ))" +%T)
             echo "| [$file]($file) | $timestamp | $elapsed | $status |" >> ../report.md
           done
           
