@@ -59,14 +59,15 @@ jobs:
       - name: Execute Notebooks and Generate Report
         run: |
           echo "## Notebook Execution Report" > report.md
-          echo "| Notebook Name | Last Run | Status |" >> report.md
-          echo "|---|---|---|" >> report.md
+          echo "| Notebook Name | Last Run | Duration | Status |" >> report.md
+          echo "|---|---|---|---|" >> report.md
           
           cd target-repo
           for file in *.ipynb; do
             echo "Running $file..."
             # Get current timestamp
             timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            start=$(date +"%s")
             
             # Execute with Papermill
             if papermill "$file" "${file%.ipynb}_out.ipynb" --execution-timeout ${{ inputs.timeout }}; then
@@ -74,8 +75,8 @@ jobs:
             else
               status="❌ Failed (or Timed Out)"
             fi
-            
-            echo "| [$file]($file) | $timestamp | $status |" >> ../report.md
+            elapsed=$(date -u -r $(($(date +"%s") - start)) +%T)
+            echo "| [$file]($file) | $timestamp | $elapsed | $status |" >> ../report.md
           done
           
       - name: Upload Executed Notebooks and Report
