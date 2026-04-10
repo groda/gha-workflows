@@ -40,6 +40,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Verify Java Version
+        run: |
+          echo "The environment variable is: $JAVA_HOME"
+          java -version
           
       - name: Set up Python
         uses: actions/setup-python@v5
